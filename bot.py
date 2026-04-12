@@ -5,8 +5,16 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from openai import OpenAI
 from datetime import date
+from flask import Flask
 
 import os
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running"
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -157,6 +165,23 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 print("Бот запущен...")
 
+
 if __name__ == "__main__":
-    print("Bot started")
-    app.run_polling()
+    print("BOT STARTED")
+
+    from flask import Flask
+    import os
+    from threading import Thread
+
+    app = Flask(__name__)
+
+    @app.route("/")
+    def home():
+        return "Bot is running"
+
+    # запускаем Telegram bot в фоне
+    Thread(target=lambda: app.run_polling()).start()
+
+    # открываем порт для Render
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
