@@ -7,7 +7,6 @@ from openai import OpenAI
 from datetime import date
 
 import os
-print("KEY =", os.getenv("OPENAI_API_KEY"))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
@@ -73,7 +72,6 @@ keyboard = [
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("MESSAGE RECEIVED")
     user_text = update.message.text    
 
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
