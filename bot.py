@@ -9,14 +9,9 @@ from flask import Flask
 
 import os
 
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Bot is running"
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
+application = ApplicationBuilder().token(TOKEN).build()
 
 
 SYSTEM_PROMPT = """
@@ -180,7 +175,7 @@ if __name__ == "__main__":
         return "Bot is running"
 
     # запускаем Telegram bot в фоне
-    Thread(target=lambda: app.run_polling()).start()
+    Thread(target=lambda: application.run_polling()).start()
 
     # открываем порт для Render
     port = int(os.environ.get("PORT", 10000))
