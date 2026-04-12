@@ -73,6 +73,7 @@ keyboard = [
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("MESSAGE RECEIVED")
     user_text = update.message.text    
 
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
@@ -157,4 +158,7 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 print("Бот запущен...")
-app.run_polling()
+
+if __name__ == "__main__":
+    print("Bot started")
+    app.run_polling()
