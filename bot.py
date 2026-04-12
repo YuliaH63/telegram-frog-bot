@@ -173,10 +173,7 @@ print("Бот запущен...")
 
 
 if __name__ == "__main__":
-    print("🚀 BOT STARTED")
-
-    # Flask в фоне
-    Thread(target=run_flask).start()
+    print("🚀 BOT STARTED")   
 
     # Telegram bot в главном потоке
     application.run_polling()   
