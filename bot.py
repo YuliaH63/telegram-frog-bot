@@ -7,7 +7,7 @@ from openai import OpenAI
 from datetime import date
 
 import os
-
+print("KEY =", os.getenv("OPENAI_API_KEY"))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
