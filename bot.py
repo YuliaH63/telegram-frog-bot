@@ -6,13 +6,23 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 from openai import OpenAI
 from datetime import date
 from flask import Flask
+from threading import Thread
+
 
 import os
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
+app = Flask(__name__)
 
+@app.route("/")
+def home():
+    return "Bot is running"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 SYSTEM_PROMPT = """
 Ты — консультант системы «Квантовая Лягушка».
@@ -158,25 +168,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+
 print("Бот запущен...")
 
 
 if __name__ == "__main__":
-    print("BOT STARTED")
+    print("🚀 BOT STARTED")
 
-    from flask import Flask
-    import os
-    from threading import Thread
+    # Flask в фоне
+    Thread(target=run_flask).start()
 
-    app = Flask(__name__)
-
-    @app.route("/")
-    def home():
-        return "Bot is running"
-
-    # запускаем Telegram bot в фоне
-    Thread(target=lambda: application.run_polling()).start()
-
-    # открываем порт для Render
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    # Telegram bot в главном потоке
+    application.run_polling()   
