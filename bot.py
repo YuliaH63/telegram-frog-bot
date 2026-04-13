@@ -13,6 +13,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
 
+application.add_handler(MessageHandler(filters.ALL, lambda update, context: print("UPDATE RECEIVED")))
 
 SYSTEM_PROMPT = """
 Ты — консультант системы «Квантовая Лягушка».
