@@ -74,6 +74,10 @@ keyboard = [
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+async def start(update, context):
+    print("START CALLED")
+    await update.message.reply_text("Привет!")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text    
 
