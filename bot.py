@@ -155,13 +155,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(answer, reply_markup=reply_markup)
 
 
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+#app = ApplicationBuilder().token(TOKEN).build()
+#app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 
-print("Бот запущен...")
+#print("Бот запущен...")
 
 
 
 # Telegram bot в главном потоке
-application.run_polling()   
+#application.run_polling()   
+
+if __name__ == "__main__":
+    print("🚀 BOT STARTED")
+    application.run_polling()
