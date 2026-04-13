@@ -2,7 +2,7 @@ MAX_FREE_ANALYSIS = 5
 ADMIN_ID = 1724691240  # ← вставь свой ID
 
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
 from datetime import date
 
@@ -172,7 +172,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Telegram bot в главном потоке
-#application.run_polling()   
+#application.run_polling()  
+
+application.add_handler(CommandHandler("start", start))
+#application.add_handler(MessageHandler(filters.ALL, debug))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
 
 if __name__ == "__main__":
     print("🚀 BOT STARTED")
