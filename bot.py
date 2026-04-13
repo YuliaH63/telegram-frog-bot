@@ -13,7 +13,12 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
 
-application.add_handler(MessageHandler(filters.ALL, lambda update, context: print("UPDATE RECEIVED")))
+async def start(update, context):
+    print("START OK")
+    await update.message.reply_text("Бот работает 🚀")
+
+async def debug(update, context):
+    print("UPDATE RECEIVED")
 
 SYSTEM_PROMPT = """
 Ты — консультант системы «Квантовая Лягушка».
@@ -75,9 +80,7 @@ keyboard = [
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-async def start(update, context):
-    print("START CALLED")
-    await update.message.reply_text("Привет!")
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text    
