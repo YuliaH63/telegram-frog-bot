@@ -13,9 +13,14 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
 
+
+
 async def start(update, context):
     print("START OK")
-    await update.message.reply_text("Бот работает 🚀")
+    await update.message.reply_text(
+        "Бот снова работает 🚀",
+        reply_markup=reply_markup
+    )
 
 async def debug(update, context):
     print("UPDATE RECEIVED")
