@@ -155,6 +155,23 @@ def has_energy_access(user_id):
 
             return unlimited or balance > 0
 
+    
+    def run_energy_matrix_analysis(goal, clarification=None):
+    user_content = f"Цель пользователя: {goal}"
+
+    if clarification:
+        user_content += f"\nУточнение пользователя: {clarification}"
+
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": ENERGY_MATRIX_PROMPT},
+            {"role": "user", "content": user_content}
+        ]
+    )
+
+    return response.choices[0].message.content
+    
 
 async def start(update, context):
     print("START OK")
@@ -238,6 +255,42 @@ SYSTEM_PROMPT = """
    Пиши так, чтобы человек чувствовал: «меня поняли».
 """
 
+ENERGY_MATRIX_PROMPT = """
+Ты проводишь диагностику по методу «Энергоматрица».
+
+Цель пользователя всегда является точкой отсчёта.
+
+Нужно определить три координаты:
+E — энергия/ресурс
+F — движущая сила
+S — сопротивление
+
+Каждая координата может принимать значение:
+-1, 0, +1
+
+Важно:
+если хотя бы одна координата неоднозначна и по имеющимся данным возможны два или более обоснованных значения,
+НЕ выбирай значение самостоятельно.
+Сначала задай ОДИН уточняющий вопрос, который позволит различить варианты.
+После ответа пользователя продолжи диагностику.
+
+Если данных достаточно, верни результат строго в формате:
+
+STATUS: COMPLETE
+E: ...
+F: ...
+S: ...
+STATE: ...
+EXPLANATION: ...
+NEXT_STEP: ...
+
+Если данных недостаточно, верни:
+
+STATUS: CLARIFY
+QUESTION: ...
+
+Не добавляй ничего вне этого формата.
+"""
 
 keyboard = [
     ["🔍 Посмотреть глубже", "🔀 Другие варианты"],
@@ -305,12 +358,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         goal = user_text.strip()
     
         context.user_data["energy_goal"] = goal
-        context.user_data["state"] = "ENERGY_MATRIX_ANALYSIS"
+        result = run_energy_matrix_analysis(goal)
+
+        print("ENERGY MATRIX RESULT:")
+        print(result)
     
-        await update.message.reply_text(
-            f"⚡ Цель принята:\n\n{goal}\n\n"
-            "Теперь определяем текущее состояние по Энергоматрице..."
-        )
+        await update.message.reply_text(result)
 
     return
     
