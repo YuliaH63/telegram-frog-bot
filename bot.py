@@ -77,7 +77,35 @@ def get_or_create_user(telegram_id, username):
 
     return user_id
 
+def get_or_create_energy_access(user_id):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT calculations_balance, unlimited
+                FROM energy_matrix_access
+                WHERE user_id = %s
+            """, (user_id,))
 
+            row = cur.fetchone()
+
+            if row:
+                return row
+
+            cur.execute("""
+                INSERT INTO energy_matrix_access (
+                    user_id,
+                    calculations_balance,
+                    unlimited
+                )
+                VALUES (%s, 0, FALSE)
+                RETURNING calculations_balance, unlimited
+            """, (user_id,))
+
+            access = cur.fetchone()
+
+        conn.commit()
+
+    return access
 
 
 
@@ -92,7 +120,14 @@ async def start(update, context):
         username=username
     )
 
+    balance, unlimited = get_or_create_energy_access(user_id)
+    
     print("USER ID IN DB:", user_id)
+    print("ENERGY ACCESS:")
+    print("balance =", balance)
+    print("unlimited =", unlimited)
+
+    
 
     await update.message.reply_text(
         "Бот работает 🚀",
