@@ -291,6 +291,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # ⚡ Энергоматрица — ждём цель
+    if state == "ENERGY_MATRIX_WAITING_FOR_GOAL":
+    
+        goal = user_text.strip()
+    
+        context.user_data["energy_goal"] = goal
+        context.user_data["state"] = "ENERGY_MATRIX_ANALYSIS"
+    
+        await update.message.reply_text(
+            f"⚡ Цель принята:\n\n{goal}\n\n"
+            "Теперь определяем текущее состояние по Энергоматрице..."
+        )
+
+    return
+    
     # 📍 Если ждём ситуацию
     if state == "WAITING_FOR_SITUATION":
         user_id = update.message.from_user.id
