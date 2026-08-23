@@ -22,6 +22,35 @@ def test_db():
             result = cur.fetchone()
             print("DATABASE OK:", result)
 
+def init_db():
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT UNIQUE NOT NULL,
+                    username TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS energy_matrix_access (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER UNIQUE NOT NULL
+                        REFERENCES users(id)
+                        ON DELETE CASCADE,
+                    calculations_balance INTEGER DEFAULT 0,
+                    unlimited BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        conn.commit()
+
+    print("DATABASE TABLES READY")
+
 async def start(update, context):
     print("START OK")
     await update.message.reply_text(
@@ -193,4 +222,5 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_m
 if __name__ == "__main__":
     print("🚀 BOT STARTED")
     test_db()
+    init_db()
     application.run_polling()
