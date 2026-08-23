@@ -107,6 +107,36 @@ def get_or_create_energy_access(user_id):
 
     return access
 
+def has_energy_access(user_id):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT calculations_balance, unlimited
+                FROM energy_matrix_access
+                WHERE user_id = %s
+            """, (user_id,))
+
+            row = cur.fetchone()
+
+            if not row:
+                return False
+
+            balance, unlimited = row
+
+            return unlimited or balance > 0
+
+def add_energy_calculations(user_id, amount):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE energy_matrix_access
+                SET calculations_balance = calculations_balance + %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s
+            """, (amount, user_id))
+
+        conn.commit()
+
 
 
 async def start(update, context):
@@ -119,7 +149,8 @@ async def start(update, context):
         telegram_id=telegram_id,
         username=username
     )
-
+    
+    add_energy_calculations(user_id, 10)
     balance, unlimited = get_or_create_energy_access(user_id)
     
     print("USER ID IN DB:", user_id)
