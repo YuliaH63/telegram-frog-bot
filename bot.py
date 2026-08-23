@@ -137,6 +137,23 @@ def add_energy_calculations(user_id, amount):
 
         conn.commit()
 
+def has_energy_access(user_id):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT calculations_balance, unlimited
+                FROM energy_matrix_access
+                WHERE user_id = %s
+            """, (user_id,))
+
+            row = cur.fetchone()
+
+            if not row:
+                return False
+
+            balance, unlimited = row
+
+            return unlimited or balance > 0
 
 
 async def start(update, context):
@@ -221,8 +238,10 @@ SYSTEM_PROMPT = """
    Пиши так, чтобы человек чувствовал: «меня поняли».
 """
 
+
 keyboard = [
     ["🔍 Посмотреть глубже", "🔀 Другие варианты"],
+    ["⚡ Энергоматрица"],
     ["🆕 Новый разбор"]
 ]
 
@@ -234,7 +253,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text    
 
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
-        
+
+    # ⚡ Энергоматрица
+    if user_text == "⚡ Энергоматрица":
+        telegram_id = update.effective_user.id
+        username = update.effective_user.username
+
+        user_id = get_or_create_user(
+        telegram_id=telegram_id,
+        username=username
+        )
+
+        get_or_create_energy_access(user_id)
+    
+        if has_energy_access(user_id):
+            await update.message.reply_text(
+                "⚡ Доступ к Энергоматрице открыт.\n\n"
+                "Скоро здесь начнётся диагностика состояния энергии.",
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                "⚡ Сейчас у тебя нет доступных расчётов Энергоматрицы.",
+                reply_markup=reply_markup
+            )
+    
+            return
 
     # 🆕 Новый разбор
     if user_text == "🆕 Новый разбор":
