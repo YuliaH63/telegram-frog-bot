@@ -150,7 +150,7 @@ async def start(update, context):
         username=username
     )
     
-    add_energy_calculations(user_id, 10)
+    # add_energy_calculations(user_id, 10)
     balance, unlimited = get_or_create_energy_access(user_id)
     
     print("USER ID IN DB:", user_id)
