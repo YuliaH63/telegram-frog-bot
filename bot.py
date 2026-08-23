@@ -51,10 +51,51 @@ def init_db():
 
     print("DATABASE TABLES READY")
 
+def get_or_create_user(telegram_id, username):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id
+                FROM users
+                WHERE telegram_id = %s
+            """, (telegram_id,))
+
+            row = cur.fetchone()
+
+            if row:
+                return row[0]
+
+            cur.execute("""
+                INSERT INTO users (telegram_id, username)
+                VALUES (%s, %s)
+                RETURNING id
+            """, (telegram_id, username))
+
+            user_id = cur.fetchone()[0]
+
+        conn.commit()
+
+    return user_id
+
+
+
+
+
 async def start(update, context):
     print("START OK")
+
+    telegram_id = update.effective_user.id
+    username = update.effective_user.username
+
+    user_id = get_or_create_user(
+        telegram_id=telegram_id,
+        username=username
+    )
+
+    print("USER ID IN DB:", user_id)
+
     await update.message.reply_text(
-        "Бот снова работает 🚀",
+        "Бот работает 🚀",
         reply_markup=reply_markup
     )
 
