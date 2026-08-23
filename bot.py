@@ -170,7 +170,7 @@ def run_energy_matrix_analysis(goal, clarification=None):
         ]
     )
 
-return response.choices[0].message.content
+    return response.choices[0].message.content
     
 
 async def start(update, context):
