@@ -267,9 +267,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         get_or_create_energy_access(user_id)
     
         if has_energy_access(user_id):
+            context.user_data["state"] = "ENERGY_MATRIX_WAITING_FOR_GOAL"
+        
             await update.message.reply_text(
-                "⚡ Доступ к Энергоматрице открыт.\n\n"
-                "Скоро здесь начнётся диагностика состояния энергии.",
+                "⚡ Энергоматрица\n\n"
+                "Опиши конкретную цель или ситуацию, относительно которой "
+                "хочешь определить своё текущее состояние энергии.\n\n"
+                "Например:\n"
+                "— хочу запустить новый проект\n"
+                "— хочу увеличить доход\n"
+                "— хочу понять, почему не двигаюсь в отношениях\n"
+                "— хочу довести начатое до результата",
                 reply_markup=reply_markup
             )
         else:
