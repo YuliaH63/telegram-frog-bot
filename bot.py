@@ -157,18 +157,18 @@ def has_energy_access(user_id):
 
     
     def run_energy_matrix_analysis(goal, clarification=None):
-    user_content = f"Цель пользователя: {goal}"
-
-    if clarification:
-        user_content += f"\nУточнение пользователя: {clarification}"
-
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": ENERGY_MATRIX_PROMPT},
-            {"role": "user", "content": user_content}
-        ]
-    )
+        user_content = f"Цель пользователя: {goal}"
+    
+        if clarification:
+            user_content += f"\nУточнение пользователя: {clarification}"
+    
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": ENERGY_MATRIX_PROMPT},
+                {"role": "user", "content": user_content}
+            ]
+        )
 
     return response.choices[0].message.content
     
