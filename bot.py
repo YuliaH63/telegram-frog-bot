@@ -156,11 +156,29 @@ def has_energy_access(user_id):
             return unlimited or balance > 0
 
     
-def run_energy_matrix_analysis(goal, clarification=None):
-    user_content = f"Цель пользователя: {goal}"
+def run_energy_matrix_analysis(
+    goal,
+    clarifications=None,
+    force_complete=False
+):
+    clarifications = clarifications or []
 
-    if clarification:
-        user_content += f"\nУточнение пользователя: {clarification}"
+    user_content = f"Цель пользователя: {goal}\n"
+
+    if clarifications:
+        user_content += "\nОтветы пользователя на уточняющие вопросы:\n"
+
+        for i, clarification in enumerate(clarifications, start=1):
+            user_content += f"{i}. {clarification}\n"
+
+    if force_complete:
+        user_content += """
+Уточняющие вопросы больше задавать нельзя.
+Обязательно заверши диагностику.
+Верни STATUS: COMPLETE.
+Выбери наиболее обоснованные значения E, F и S
+на основании всей полученной информации.
+"""
 
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
@@ -271,7 +289,8 @@ reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text    
-
+    context.user_data["energy_clarifications"] = []
+    context.user_data["energy_clarification_count"] = 0
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
 
     # ⚡ Энергоматрица
@@ -288,7 +307,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         if has_energy_access(user_id):
             context.user_data["state"] = "ENERGY_MATRIX_WAITING_FOR_GOAL"
-        
+            context.user_data["energy_clarifications"] = []
+            context.user_data["energy_clarification_count"] = 0
+            
             await update.message.reply_text(
                 "⚡ Энергоматрица\n\n"
                 "Опиши конкретную цель или ситуацию, относительно которой "
@@ -325,12 +346,88 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         goal = user_text.strip()
     
         context.user_data["energy_goal"] = goal
-        result = run_energy_matrix_analysis(goal)
-
+        context.user_data["energy_clarifications"] = []
+        context.user_data["energy_clarification_count"] = 0
+    
+        result = run_energy_matrix_analysis(
+            goal=goal,
+            clarifications=[],
+            force_complete=False
+        )
+    
         print("ENERGY MATRIX RESULT:")
         print(result)
     
-        await update.message.reply_text(result)
+        # Нужно уточнение
+        if "STATUS: CLARIFY" in result:
+    
+            question = result.split("QUESTION:", 1)[1].strip()
+    
+            context.user_data["state"] = "ENERGY_MATRIX_WAITING_FOR_CLARIFICATION"
+    
+            await update.message.reply_text(
+                f"⚡ Мне нужно немного уточнить:\n\n{question}"
+            )
+    
+        # Диагностика уже готова
+        elif "STATUS: COMPLETE" in result:
+    
+            context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
+    
+            await update.message.reply_text(result)
+    
+        else:
+            await update.message.reply_text(
+                "Не удалось корректно определить состояние. Попробуй сформулировать цель немного подробнее."
+            )
+
+    return
+
+    # ⚡ Энергоматрица — получили ответ на уточнение
+    if state == "ENERGY_MATRIX_WAITING_FOR_CLARIFICATION":
+    
+        goal = context.user_data.get("energy_goal", "")
+    
+        clarifications = context.user_data.get(
+            "energy_clarifications", []
+        )
+    
+        clarifications.append(user_text)
+    
+        context.user_data["energy_clarifications"] = clarifications
+    
+        count = context.user_data.get(
+            "energy_clarification_count", 0
+        ) + 1
+    
+        context.user_data["energy_clarification_count"] = count
+    
+        # После второго уточнения обязательно завершаем
+        force_complete = count >= 2
+    
+        result = run_energy_matrix_analysis(
+            goal=goal,
+            clarifications=clarifications,
+            force_complete=force_complete
+        )
+    
+        print("ENERGY MATRIX RESULT:")
+        print(result)
+    
+        if "STATUS: CLARIFY" in result and not force_complete:
+    
+            question = result.split("QUESTION:", 1)[1].strip()
+    
+            context.user_data["state"] = "ENERGY_MATRIX_WAITING_FOR_CLARIFICATION"
+    
+            await update.message.reply_text(
+                f"⚡ Ещё один момент:\n\n{question}"
+            )
+    
+        else:
+            context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
+    
+            await update.message.reply_text(result)
 
     return
     
