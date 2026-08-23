@@ -6,14 +6,21 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 from openai import OpenAI
 from datetime import date
 
+import psycopg
 
 import os
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-
+def test_db():
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            result = cur.fetchone()
+            print("DATABASE OK:", result)
 
 async def start(update, context):
     print("START OK")
@@ -183,7 +190,7 @@ application.add_handler(CommandHandler("start", start))
 #application.add_handler(MessageHandler(filters.ALL, debug))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-
 if __name__ == "__main__":
     print("🚀 BOT STARTED")
+    test_db()
     application.run_polling()
