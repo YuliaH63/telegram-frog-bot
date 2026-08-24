@@ -372,14 +372,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Диагностика уже готова
         elif "STATUS: COMPLETE" in result:
     
-            user_result = result.split("STATE:", 1)[1]
-
-            # если хотим сохранить название состояния
-            state_name = user_result.split("\n", 1)[0].strip()
-        
-            # пользовательский текст начинается с цели
             if "🎯 ЦЕЛЬ:" in result:
                 user_result = "🎯 ЦЕЛЬ:" + result.split("🎯 ЦЕЛЬ:", 1)[1]
+            else:
+                user_result = result.replace("STATUS: COMPLETE", "", 1).strip()
+        
+            context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
         
             await update.message.reply_text(user_result)
     
