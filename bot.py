@@ -209,6 +209,38 @@ def use_energy_calculation(user_id):
 
     return row[0] if row else None
 
+async def finish_energy_matrix(
+    update,
+    context,
+    result,
+    user_id
+):
+    if "🎯 ЦЕЛЬ:" in result:
+        user_result = "🎯 ЦЕЛЬ:" + result.split("🎯 ЦЕЛЬ:", 1)[1]
+    else:
+        user_result = result.replace("STATUS: COMPLETE", "", 1).strip()
+
+    remaining = use_energy_calculation(user_id)
+
+    await update.message.reply_text(user_result)
+
+    if remaining is not None and remaining > 0:
+        context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
+
+        await update.message.reply_text(
+            f"⚡ Осталось расчётов: {remaining}\n\n"
+            "Хотите сделать ещё один расчёт?",
+            reply_markup=energy_continue_keyboard
+        )
+
+    elif remaining == 0:
+        context.user_data["state"] = "WAITING_FOR_SITUATION"
+
+        await update.message.reply_text(
+            "⚡ Это был последний доступный расчёт.\n\n"
+            "Возвращаемся в главное меню 🐸",
+            reply_markup=reply_markup
+        )
 
 async def start(update, context):
     print("START OK")
@@ -302,6 +334,14 @@ keyboard = [
     ["🆕 Новый разбор"]
 ]
 
+energy_continue_keyboard = ReplyKeyboardMarkup(
+    [
+        ["⚡ Да, ещё расчёт"],
+        ["↩️ Нет, вернуться в меню"]
+    ],
+    resize_keyboard=True
+)
+
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 energy_no_balance_keyboard = InlineKeyboardMarkup([
@@ -369,6 +409,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
             return
 
+    # ⚡ Ещё один расчёт Энергоматрицы
+    if user_text == "⚡ Да, ещё расчёт":
+        context.user_data["state"] = "ENERGY_MATRIX_WAITING_FOR_GOAL"
+        context.user_data["energy_clarifications"] = []
+        context.user_data["energy_clarification_count"] = 0
+    
+        await update.message.reply_text(
+            "⚡ Опиши новую цель или ситуацию, "
+            "относительно которой хочешь определить своё текущее состояние энергии.",
+            reply_markup=reply_markup
+        )
+        return
+    
+    
+    # ↩️ Выход из Энергоматрицы
+    if user_text == "↩️ Нет, вернуться в меню":
+        context.user_data["state"] = "WAITING_FOR_SITUATION"
+        context.user_data.pop("energy_goal", None)
+        context.user_data.pop("energy_clarifications", None)
+        context.user_data.pop("energy_clarification_count", None)
+    
+        await update.message.reply_text(
+            "🐸 Возвращаемся в главное меню.",
+            reply_markup=reply_markup
+        )
+        return
+    
     # 🆕 Новый разбор
     if user_text == "🆕 Новый разбор":
         context.user_data["state"] = "WAITING_FOR_SITUATION"
@@ -410,24 +477,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     
         # Диагностика уже готова
-        elif "STATUS: COMPLETE" in result:
-    
-            if "🎯 ЦЕЛЬ:" in result:
-                user_result = "🎯 ЦЕЛЬ:" + result.split("🎯 ЦЕЛЬ:", 1)[1]
-            else:
-                user_result = result.replace("STATUS: COMPLETE", "", 1).strip()
-        
-            context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
-            
-            remaining = use_energy_calculation(user_id)
-        
-            await update.message.reply_text(user_result)
-
-            if remaining is not None:
-                await update.message.reply_text(
-                    f"⚡ Осталось расчётов: {remaining}"
-                )
-    
+        elif "STATUS: COMPLETE" in result:    
+             await finish_energy_matrix(
+                update,
+                context,
+                result,
+                user_id
+            )    
         else:
             await update.message.reply_text(
                 "Не удалось корректно определить состояние. Попробуй сформулировать цель немного подробнее."
@@ -477,9 +533,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     
         else:
-            context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
-    
-            await update.message.reply_text(result)
+            await finish_energy_matrix(
+                update,
+                context,
+                result,
+                user_id
+            )
 
     return
     
