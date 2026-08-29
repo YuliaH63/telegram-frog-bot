@@ -7,51 +7,14 @@ from openai import OpenAI
 from datetime import date
 
 import psycopg
-
 import os
+import re
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-ENERGY_MATRIX_STATES = {
-    (-1, -1, -1): "ИСТОЩЕНИЕ",
-    (-1, -1,  0): "ДЕФИЦИТ",
-    (-1, -1, +1): "БЕССИЛИЕ",
-
-    (-1,  0, -1): "ВОССТАНОВЛЕНИЕ",
-    (-1,  0,  0): "ЗАМЕДЛЕНИЕ",
-    (-1,  0, +1): "ЗАТРУДНЕНИЕ",
-
-    (-1, +1, -1): "РЫВОК",
-    (-1, +1,  0): "НАПРЯЖЁННОЕ ДЕЙСТВИЕ",
-    (-1, +1, +1): "ФОРСИРОВАНИЕ",
-
-    (0, -1, -1): "ПАУЗА",
-    (0, -1,  0): "ЗАСТОЙ",
-    (0, -1, +1): "БЛОКИРОВКА",
-
-    (0,  0, -1): "СВОБОДНОЕ ДВИЖЕНИЕ",
-    (0,  0,  0): "РАВНОВЕСИЕ",
-    (0,  0, +1): "ЗАТРУДНЁННОЕ ДВИЖЕНИЕ",
-
-    (0, +1, -1): "ПОТОК",
-    (0, +1,  0): "АКТИВНОЕ ДВИЖЕНИЕ",
-    (0, +1, +1): "НАПРЯЖЕНИЕ",
-
-    (+1, -1, -1): "ИЗБЫТОК",
-    (+1, -1,  0): "НАКОПЛЕНИЕ",
-    (+1, -1, +1): "УДЕРЖИВАНИЕ",
-
-    (+1,  0, -1): "СВОБОДНЫЙ РЕСУРС",
-    (+1,  0,  0): "СТАБИЛЬНОСТЬ",
-    (+1,  0, +1): "НАПРЯЖЁННОЕ УДЕРЖИВАНИЕ",
-
-    (+1, +1, -1): "МОЩНЫЙ ПОТОК",
-    (+1, +1,  0): "ИНТЕНСИВНОЕ ДВИЖЕНИЕ",
-    (+1, +1, +1): "ПЕРЕНАПРЯЖЕНИЕ",
-}
 
 def test_db():
     with psycopg.connect(DATABASE_URL) as conn:
@@ -206,7 +169,56 @@ def format_energy_neighbors(e, f, s):
         )
 
     return "\n".join(lines)
-    
+
+def replace_energy_neighbors(result):
+
+    e_match = re.search(
+        r"^E:\s*([+-]?\d+)",
+        result,
+        re.MULTILINE
+    )
+
+    f_match = re.search(
+        r"^F:\s*([+-]?\d+)",
+        result,
+        re.MULTILINE
+    )
+
+    s_match = re.search(
+        r"^S:\s*([+-]?\d+)",
+        result,
+        re.MULTILINE
+    )
+
+    if not e_match or not f_match or not s_match:
+        return result
+
+    e = int(e_match.group(1))
+    f = int(f_match.group(1))
+    s = int(s_match.group(1))
+
+    correct_neighbors = format_energy_neighbors(
+        e,
+        f,
+        s
+    )
+
+    pattern = (
+        r"СОСЕДНИЕ СОСТОЯНИЯ:.*?"
+        r"(?=🧭\s*РЕКОМЕНДУЕМЫЙ ПЕРЕХОД:)"
+    )
+
+    if re.search(pattern, result, re.DOTALL):
+
+        result = re.sub(
+            pattern,
+            correct_neighbors + "\n\n",
+            result,
+            flags=re.DOTALL
+        )
+
+    return result
+
 
 def add_energy_calculations(user_id, amount):
     with psycopg.connect(DATABASE_URL) as conn:
@@ -237,6 +249,100 @@ def has_energy_access(user_id):
             balance, unlimited = row
 
             return unlimited or balance > 0
+
+ENERGY_MATRIX_STATES = {
+    (-1, -1, -1): "ИСТОЩЕНИЕ",
+    (-1, -1,  0): "ДЕФИЦИТ",
+    (-1, -1, +1): "БЕССИЛИЕ",
+
+    (-1,  0, -1): "ВОССТАНОВЛЕНИЕ",
+    (-1,  0,  0): "ЗАМЕДЛЕНИЕ",
+    (-1,  0, +1): "ЗАТРУДНЕНИЕ",
+
+    (-1, +1, -1): "РЫВОК",
+    (-1, +1,  0): "НАПРЯЖЁННОЕ ДЕЙСТВИЕ",
+    (-1, +1, +1): "ФОРСИРОВАНИЕ",
+
+    (0, -1, -1): "ПАУЗА",
+    (0, -1,  0): "ЗАСТОЙ",
+    (0, -1, +1): "БЛОКИРОВКА",
+
+    (0,  0, -1): "СВОБОДНОЕ ДВИЖЕНИЕ",
+    (0,  0,  0): "РАВНОВЕСИЕ",
+    (0,  0, +1): "ЗАТРУДНЁННОЕ ДВИЖЕНИЕ",
+
+    (0, +1, -1): "ПОТОК",
+    (0, +1,  0): "АКТИВНОЕ ДВИЖЕНИЕ",
+    (0, +1, +1): "НАПРЯЖЕНИЕ",
+
+    (+1, -1, -1): "ИЗБЫТОК",
+    (+1, -1,  0): "НАКОПЛЕНИЕ",
+    (+1, -1, +1): "УДЕРЖИВАНИЕ",
+
+    (+1,  0, -1): "СВОБОДНЫЙ РЕСУРС",
+    (+1,  0,  0): "СТАБИЛЬНОСТЬ",
+    (+1,  0, +1): "НАПРЯЖЁННОЕ УДЕРЖИВАНИЕ",
+
+    (+1, +1, -1): "МОЩНЫЙ ПОТОК",
+    (+1, +1,  0): "ИНТЕНСИВНОЕ ДВИЖЕНИЕ",
+    (+1, +1, +1): "ПЕРЕНАПРЯЖЕНИЕ",
+}
+
+
+def format_energy_value(value):
+    if value > 0:
+        return f"+{value}"
+    return str(value)
+
+
+def format_energy_coords(coords):
+    e, f, s = coords
+
+    return (
+        f"({format_energy_value(e)},"
+        f"{format_energy_value(f)},"
+        f"{format_energy_value(s)})"
+    )
+
+
+def get_energy_neighbors(e, f, s):
+    current = (e, f, s)
+    neighbors = []
+
+    for index in range(3):
+        for delta in (-1, 1):
+
+            candidate = list(current)
+            candidate[index] += delta
+
+            # Координата может быть только -1, 0 или +1
+            if candidate[index] not in (-1, 0, 1):
+                continue
+
+            candidate = tuple(candidate)
+
+            state_name = ENERGY_MATRIX_STATES.get(candidate)
+
+            if state_name:
+                neighbors.append(
+                    (candidate, state_name)
+                )
+
+    return neighbors
+
+
+def format_energy_neighbors(e, f, s):
+    neighbors = get_energy_neighbors(e, f, s)
+
+    lines = ["СОСЕДНИЕ СОСТОЯНИЯ:"]
+
+    for coords, state_name in neighbors:
+        lines.append(
+            f"{format_energy_coords(coords)} — {state_name}"
+        )
+
+    return "\n".join(lines)
+
 
     
 def run_energy_matrix_analysis(
@@ -302,7 +408,8 @@ async def finish_energy_matrix(
         user_result = "🎯 ЦЕЛЬ:" + result.split("🎯 ЦЕЛЬ:", 1)[1]
     else:
         user_result = result.replace("STATUS: COMPLETE", "", 1).strip()
-
+        
+    user_result = replace_energy_neighbors(user_result)
     remaining = use_energy_calculation(user_id)
 
     await update.message.reply_text(user_result)
