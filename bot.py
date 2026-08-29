@@ -316,9 +316,7 @@ energy_no_balance_keyboard = InlineKeyboardMarkup([
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text    
-    context.user_data["energy_clarifications"] = []
-    context.user_data["energy_clarification_count"] = 0
+    user_text = update.message.text        
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
 
     # ⚡ Энергоматрица
@@ -424,7 +422,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Не удалось корректно определить состояние. Попробуй сформулировать цель немного подробнее."
             )
 
-    return
+        return
 
     # ⚡ Энергоматрица — получили ответ на уточнение
     if state == "ENERGY_MATRIX_WAITING_FOR_CLARIFICATION":
