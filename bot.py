@@ -343,7 +343,54 @@ def format_energy_neighbors(e, f, s):
 
     return "\n".join(lines)
 
+def summarize_energy_goal(goal, clarifications=None):
+    clarifications = clarifications or []
 
+    user_content = f"Исходный запрос пользователя:\n{goal}\n"
+
+    if clarifications:
+        user_content += "\nУточнения пользователя:\n"
+
+        for i, clarification in enumerate(
+            clarifications,
+            start=1
+        ):
+            user_content += f"{i}. {clarification}\n"
+
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": """
+Сформулируй цель пользователя для диагностики по Энергоматрице.
+
+Используй только информацию, которую сообщил пользователь.
+
+Не добавляй предположений о его чувствах,
+мотивах, причинах или обстоятельствах.
+
+Цель должна:
+— отражать, что пользователь хочет изменить или получить;
+— учитывать исходный запрос и уточняющие ответы;
+— быть понятной и конкретной;
+— состоять из одного короткого предложения;
+— не содержать координаты E, F, S;
+— не содержать диагноз;
+— не содержать рекомендацию.
+
+Верни только формулировку цели.
+Без вступления и пояснений.
+"""
+            },
+            {
+                "role": "user",
+                "content": user_content
+            }
+        ]
+    )
+
+    return response.choices[0].message.content.strip()
     
 def run_energy_matrix_analysis(
     goal,
@@ -404,16 +451,79 @@ async def finish_energy_matrix(
     result,
     user_id
 ):
-    if "🎯 ЦЕЛЬ:" in result:
-        user_result = "🎯 ЦЕЛЬ:" + result.split("🎯 ЦЕЛЬ:", 1)[1]
-    else:
-        user_result = result.replace("STATUS: COMPLETE", "", 1).strip()
-        
-    user_result = replace_energy_neighbors(user_result)
+    # 1. Получаем координаты из технической части ответа
+    e_match = re.search(r"^E:\s*([+-]?\d+)", result, re.MULTILINE)
+    f_match = re.search(r"^F:\s*([+-]?\d+)", result, re.MULTILINE)
+    s_match = re.search(r"^S:\s*([+-]?\d+)", result, re.MULTILINE)
+
+    if not e_match or not f_match or not s_match:
+        await update.message.reply_text(
+            "Не удалось определить координаты Энергоматрицы."
+        )
+        return
+
+    e = int(e_match.group(1))
+    f = int(f_match.group(1))
+    s = int(s_match.group(1))
+
+    # 2. Название состояния берём из фиксированной таблицы
+    state_name = ENERGY_MATRIX_STATES.get(
+        (e, f, s),
+        "НЕИЗВЕСТНОЕ СОСТОЯНИЕ"
+    )
+
+    # 3. Цель берём из сохранённого контекста
+    goal = context.user_data.get(
+        "energy_goal",
+        "Цель не указана"
+    )
+
+    # 4. Сначала исправляем соседние состояния
+    processed_result = replace_energy_neighbors(result)
+
+    # 5. Убираем служебные строки
+    body = re.sub(
+        r"^(STATUS: COMPLETE|"
+        r"E:\s*[+-]?\d+|"
+        r"F:\s*[+-]?\d+|"
+        r"S:\s*[+-]?\d+|"
+        r"STATE:.*|"
+        r"EXPLANATION:.*|"
+        r"NEXT_STEP:.*)\s*$",
+        "",
+        processed_result,
+        flags=re.MULTILINE
+    ).strip()
+
+    # 6. Если модель сама сформировала верхнюю карточку,
+    # убираем её, чтобы не было дубля
+    body = re.sub(
+        r"🎯\s*ЦЕЛЬ:.*?"
+        r"КОД:\s*\n?"
+        r"\(E,F,S\)\s*=\s*\([^)]+\)\s*",
+        "",
+        body,
+        flags=re.DOTALL
+    ).strip()
+
+    # 7. Формируем стабильную верхнюю карточку сами
+    header = (
+        f"🎯 ЦЕЛЬ:\n"
+        f"{goal}\n\n"
+        f"⚡️ ТЕКУЩЕЕ СОСТОЯНИЕ:\n"
+        f"{state_name}\n\n"
+        f"КОД:\n"
+        f"(E,F,S) = {format_energy_coords((e, f, s))}"
+    )
+
+    user_result = header + "\n\n" + body
+
+    # 8. Списываем расчёт только после успешной диагностики
     remaining = use_energy_calculation(user_id)
 
     await update.message.reply_text(user_result)
 
+    # 9. Показываем остаток
     if remaining is not None and remaining > 0:
         context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
 
@@ -432,6 +542,14 @@ async def finish_energy_matrix(
             reply_markup=reply_markup
         )
 
+    else:
+        # unlimited
+        context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
+
+        await update.message.reply_text(
+            "Хотите сделать ещё один расчёт?",
+            reply_markup=energy_continue_keyboard
+        )
 
 
 async def start(update, context):
@@ -530,6 +648,14 @@ energy_continue_keyboard = ReplyKeyboardMarkup(
     [
         ["⚡ Да, ещё расчёт"],
         ["↩️ Нет, вернуться в меню"]
+    ],
+    resize_keyboard=True
+)
+
+energy_goal_confirm_keyboard = ReplyKeyboardMarkup(
+    [
+        ["✅ Да, продолжить расчёт"],
+        ["✏️ Нет, скорректировать цель"]
     ],
     resize_keyboard=True
 )
@@ -639,11 +765,87 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+
+        # ✅ Цель подтверждена
+    if (
+        state == "ENERGY_MATRIX_CONFIRM_GOAL"
+        and user_text == "✅ Да, продолжить расчёт"
+    ):
+        confirmed_goal = context.user_data.get(
+            "energy_proposed_goal",
+            ""
+        )
+
+        context.user_data["energy_goal"] = confirmed_goal
+
+        clarifications = context.user_data.get(
+            "energy_clarifications",
+            []
+        )
+
+        result = run_energy_matrix_analysis(
+            goal=confirmed_goal,
+            clarifications=clarifications,
+            force_complete=True
+        )
+
+        print("ENERGY MATRIX CONFIRMED RESULT:")
+        print(result)
+
+        if "STATUS: COMPLETE" in result:
+            await finish_energy_matrix(
+                update,
+                context,
+                result,
+                user_id
+            )
+        else:
+            await update.message.reply_text(
+                "Не удалось завершить диагностику. "
+                "Попробуйте ещё раз."
+            )
+
+        return
+
+    # ✏️ Пользователь хочет изменить цель
+    if (
+        state == "ENERGY_MATRIX_CONFIRM_GOAL"
+        and user_text == "✏️ Нет, скорректировать цель"
+    ):
+        context.user_data["state"] = (
+            "ENERGY_MATRIX_WAITING_FOR_GOAL_CORRECTION"
+        )
+
+    await update.message.reply_text(
+        "✏️ Напишите, пожалуйста, "
+        "как вы хотите сформулировать цель."
+    )
+
+        return
+
+    # ✏️ Получили скорректированную цель
+    if state == "ENERGY_MATRIX_WAITING_FOR_GOAL_CORRECTION":
+
+        corrected_goal = user_text.strip()
+
+        context.user_data["energy_proposed_goal"] = corrected_goal
+        context.user_data["state"] = "ENERGY_MATRIX_CONFIRM_GOAL"
+
+        await update.message.reply_text(
+            f"🎯 Тогда фиксируем цель так:\n\n"
+            f"{corrected_goal}\n\n"
+            f"Продолжаем расчёт?",
+            reply_markup=energy_goal_confirm_keyboard
+        )
+
+        return
+
     # ⚡ Энергоматрица — ждём цель
     if state == "ENERGY_MATRIX_WAITING_FOR_GOAL":
     
         goal = user_text.strip()
     
+        context.user_data["energy_original_goal"] = goal
         context.user_data["energy_goal"] = goal
         context.user_data["energy_clarifications"] = []
         context.user_data["energy_clarification_count"] = 0
@@ -669,16 +871,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     
         # Диагностика уже готова
-        elif "STATUS: COMPLETE" in result:    
-             await finish_energy_matrix(
-                update,
-                context,
-                result,
-                user_id
-            )    
+        goal_summary = summarize_energy_goal(
+            goal,
+            []
+        )
+    
+        context.user_data["energy_proposed_goal"] = goal_summary
+        context.user_data["state"] = "ENERGY_MATRIX_CONFIRM_GOAL"
+    
+        await update.message.reply_text(
+            f"🎯 Я сформулировала цель так:\n\n"
+            f"{goal_summary}\n\n"
+            f"Правильно ли я определила цель?",
+            reply_markup=energy_goal_confirm_keyboard
+        )   
         else:
             await update.message.reply_text(
-                "Не удалось корректно определить состояние. Попробуй сформулировать цель немного подробнее."
+                "Не удалось корректно определить состояние. Попробуйте сформулировать цель немного подробнее."
             )
 
         return
@@ -725,11 +934,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     
         else:
-            await finish_energy_matrix(
-                update,
-                context,
-                result,
-                user_id
+            goal_summary = summarize_energy_goal(
+                goal,
+                clarifications
+            )
+        
+            context.user_data["energy_proposed_goal"] = goal_summary
+            context.user_data["state"] = "ENERGY_MATRIX_CONFIRM_GOAL"
+        
+            await update.message.reply_text(
+                f"🎯 С учётом ваших ответов я сформулировала цель так:\n\n"
+                f"{goal_summary}\n\n"
+                f"Правильно ли я определила цель?",
+                reply_markup=energy_goal_confirm_keyboard
             )
 
     return
