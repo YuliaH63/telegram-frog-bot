@@ -1,7 +1,7 @@
 MAX_FREE_ANALYSIS = 5
 ADMIN_ID = 1724691240  # ← вставь свой ID
 
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
 from datetime import date
@@ -190,6 +190,25 @@ def run_energy_matrix_analysis(
 
     return response.choices[0].message.content
     
+def use_energy_calculation(user_id):
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE energy_matrix_access
+                SET calculations_balance = calculations_balance - 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s
+                  AND calculations_balance > 0
+                  AND unlimited = FALSE
+                RETURNING calculations_balance
+            """, (user_id,))
+
+            row = cur.fetchone()
+
+        conn.commit()
+
+    return row[0] if row else None
+
 
 async def start(update, context):
     print("START OK")
@@ -285,6 +304,15 @@ keyboard = [
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+energy_no_balance_keyboard = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton(
+            "💳 Получить расчёт",
+            callback_data="buy_energy"
+        )
+    ]
+])
+
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -323,10 +351,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text(
-                "⚡ Сейчас у тебя нет доступных расчётов Энергоматрицы.",
+                "⚡ Доступные расчёты Энергоматрицы закончились.\n\n"
+                "Чтобы продолжить, можно получить новый расчёт или пакет расчётов.\n\n"
+                "Пока оплата ещё не подключена автоматически, "
+                "напиши мне — я открою доступ вручную 🐸",
                 reply_markup=reply_markup
             )
-    
+        
             return
 
     # 🆕 Новый разбор
@@ -378,8 +409,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_result = result.replace("STATUS: COMPLETE", "", 1).strip()
         
             context.user_data["state"] = "ENERGY_MATRIX_COMPLETE"
+            
+            remaining = use_energy_calculation(user_id)
         
             await update.message.reply_text(user_result)
+
+            if remaining is not None:
+                await update.message.reply_text(
+                    f"⚡ Осталось расчётов: {remaining}"
+                )
     
         else:
             await update.message.reply_text(
