@@ -319,6 +319,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text        
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
 
+    telegram_id = update.effective_user.id
+    username = update.effective_user.username
+
+    user_id = get_or_create_user(
+        telegram_id=telegram_id,
+        username=username
+    )
+
+    get_or_create_energy_access(user_id)
+    
+
     # ⚡ Энергоматрица
     if user_text == "⚡ Энергоматрица":
         telegram_id = update.effective_user.id
