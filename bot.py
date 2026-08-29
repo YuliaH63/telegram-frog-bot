@@ -15,6 +15,44 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 application = ApplicationBuilder().token(TOKEN).build()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+ENERGY_MATRIX_STATES = {
+    (-1, -1, -1): "ИСТОЩЕНИЕ",
+    (-1, -1,  0): "ДЕФИЦИТ",
+    (-1, -1, +1): "БЕССИЛИЕ",
+
+    (-1,  0, -1): "ВОССТАНОВЛЕНИЕ",
+    (-1,  0,  0): "ЗАМЕДЛЕНИЕ",
+    (-1,  0, +1): "ЗАТРУДНЕНИЕ",
+
+    (-1, +1, -1): "РЫВОК",
+    (-1, +1,  0): "НАПРЯЖЁННОЕ ДЕЙСТВИЕ",
+    (-1, +1, +1): "ФОРСИРОВАНИЕ",
+
+    (0, -1, -1): "ПАУЗА",
+    (0, -1,  0): "ЗАСТОЙ",
+    (0, -1, +1): "БЛОКИРОВКА",
+
+    (0,  0, -1): "СВОБОДНОЕ ДВИЖЕНИЕ",
+    (0,  0,  0): "РАВНОВЕСИЕ",
+    (0,  0, +1): "ЗАТРУДНЁННОЕ ДВИЖЕНИЕ",
+
+    (0, +1, -1): "ПОТОК",
+    (0, +1,  0): "АКТИВНОЕ ДВИЖЕНИЕ",
+    (0, +1, +1): "НАПРЯЖЕНИЕ",
+
+    (+1, -1, -1): "ИЗБЫТОК",
+    (+1, -1,  0): "НАКОПЛЕНИЕ",
+    (+1, -1, +1): "УДЕРЖИВАНИЕ",
+
+    (+1,  0, -1): "СВОБОДНЫЙ РЕСУРС",
+    (+1,  0,  0): "СТАБИЛЬНОСТЬ",
+    (+1,  0, +1): "НАПРЯЖЁННОЕ УДЕРЖИВАНИЕ",
+
+    (+1, +1, -1): "МОЩНЫЙ ПОТОК",
+    (+1, +1,  0): "ИНТЕНСИВНОЕ ДВИЖЕНИЕ",
+    (+1, +1, +1): "ПЕРЕНАПРЯЖЕНИЕ",
+}
+
 def test_db():
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
@@ -124,6 +162,51 @@ def has_energy_access(user_id):
             balance, unlimited = row
 
             return unlimited or balance > 0
+
+def get_energy_neighbors(e, f, s):
+    current = (e, f, s)
+    neighbors = []
+
+    for index in range(3):
+        for delta in (-1, 1):
+
+            candidate = list(current)
+            candidate[index] += delta
+
+            if candidate[index] not in (-1, 0, 1):
+                continue
+
+            candidate = tuple(candidate)
+
+            state_name = ENERGY_MATRIX_STATES.get(candidate)
+
+            if state_name:
+                neighbors.append({
+                    "coords": candidate,
+                    "state": state_name
+                })
+
+    return neighbors
+
+def format_energy_neighbors(e, f, s):
+    neighbors = get_energy_neighbors(e, f, s)
+
+    lines = ["СОСЕДНИЕ СОСТОЯНИЯ:"]
+
+    for item in neighbors:
+        coords = item["coords"]
+
+        coord_text = (
+            f"({coords[0]:+d},{coords[1]:+d},{coords[2]:+d})"
+            .replace("+0", "0")
+        )
+
+        lines.append(
+            f"{coord_text} — {item['state']}"
+        )
+
+    return "\n".join(lines)
+    
 
 def add_energy_calculations(user_id, amount):
     with psycopg.connect(DATABASE_URL) as conn:
@@ -241,6 +324,8 @@ async def finish_energy_matrix(
             "Возвращаемся в главное меню 🐸",
             reply_markup=reply_markup
         )
+
+
 
 async def start(update, context):
     print("START OK")
@@ -389,8 +474,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await update.message.reply_text(
                 "⚡ Энергоматрица\n\n"
-                "Опиши конкретную цель или ситуацию, относительно которой "
-                "хочешь определить своё текущее состояние энергии.\n\n"
+                "Опишиnt конкретную цель или ситуацию, относительно которой "
+                "хотите определить своё текущее состояние энергии.\n\n"
                 "Например:\n"
                 "— хочу запустить новый проект\n"
                 "— хочу увеличить доход\n"
@@ -403,7 +488,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "⚡ Доступные расчёты Энергоматрицы закончились.\n\n"
                 "Чтобы продолжить, можно получить новый расчёт или пакет расчётов.\n\n"
                 "Пока оплата ещё не подключена автоматически, "
-                "напиши мне — я открою доступ вручную 🐸",
+                "напишите мне — я открою доступ вручную 🐸",
                 reply_markup=reply_markup
             )
         
@@ -416,8 +501,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["energy_clarification_count"] = 0
     
         await update.message.reply_text(
-            "⚡ Опиши новую цель или ситуацию, "
-            "относительно которой хочешь определить своё текущее состояние энергии.",
+            "⚡ Опишите новую цель или ситуацию, "
+            "относительно которой хотите определить своё текущее состояние энергии.",
             reply_markup=reply_markup
         )
         return
@@ -442,7 +527,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop("situation", None)
 
         await update.message.reply_text(
-            "Опиши ситуацию, которую хочешь разобрать 🌿",
+            "Опишите ситуацию, которую хотите разобрать 🌿",
             reply_markup=reply_markup
         )
         return
