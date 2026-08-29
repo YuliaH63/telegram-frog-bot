@@ -861,33 +861,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         # Нужно уточнение
         if "STATUS: CLARIFY" in result:
-    
+
             question = result.split("QUESTION:", 1)[1].strip()
-    
-            context.user_data["state"] = "ENERGY_MATRIX_WAITING_FOR_CLARIFICATION"
-    
+
+            context.user_data["state"] = (
+                "ENERGY_MATRIX_WAITING_FOR_CLARIFICATION"
+            )
+
             await update.message.reply_text(
                 f"⚡ Мне нужно немного уточнить:\n\n{question}"
             )
-    
-        # Диагностика уже готова
-        goal_summary = summarize_energy_goal(
-            goal,
-            []
-        )
-    
-        context.user_data["energy_proposed_goal"] = goal_summary
-        context.user_data["state"] = "ENERGY_MATRIX_CONFIRM_GOAL"
-    
-        await update.message.reply_text(
-            f"🎯 Я сформулировала цель так:\n\n"
-            f"{goal_summary}\n\n"
-            f"Правильно ли я определила цель?",
-            reply_markup=energy_goal_confirm_keyboard
-        )   
+
+        elif "STATUS: COMPLETE" in result:
+
+            goal_summary = summarize_energy_goal(
+                goal,
+                []
+            )
+
+            context.user_data["energy_proposed_goal"] = goal_summary
+            context.user_data["state"] = "ENERGY_MATRIX_CONFIRM_GOAL"
+
+            await update.message.reply_text(
+                f"🎯 Я сформулировала цель так:\n\n"
+                f"{goal_summary}\n\n"
+                f"Правильно ли я определила цель?",
+                reply_markup=energy_goal_confirm_keyboard
+            )
+
         else:
             await update.message.reply_text(
-                "Не удалось корректно определить состояние. Попробуйте сформулировать цель немного подробнее."
+                "Не удалось корректно определить состояние. "
+                "Попробуйте сформулировать цель немного подробнее."
             )
 
         return
