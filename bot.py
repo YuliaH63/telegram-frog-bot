@@ -807,7 +807,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    # ✏️ Пользователь хочет изменить цель
+     # ✏️ Пользователь хочет изменить цель
     if (
         state == "ENERGY_MATRIX_CONFIRM_GOAL"
         and user_text == "✏️ Нет, скорректировать цель"
@@ -816,10 +816,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "ENERGY_MATRIX_WAITING_FOR_GOAL_CORRECTION"
         )
 
-    await update.message.reply_text(
-        "✏️ Напишите, пожалуйста, "
-        "как вы хотите сформулировать цель."
-    )
+        await update.message.reply_text(
+            "✏️ Напишите, пожалуйста, "
+            "как вы хотите сформулировать цель."
+        )
 
         return
 
