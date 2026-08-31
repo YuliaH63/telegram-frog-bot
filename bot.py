@@ -108,6 +108,8 @@ def get_or_create_energy_access(user_id):
 
     return access
 
+
+
 def has_energy_access(user_id):
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
@@ -686,7 +688,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     get_or_create_energy_access(user_id)
-    
+
+        # 🆕 Новый разбор — работает из любого состояния
+    if user_text == "🆕 Новый разбор":
+        context.user_data["state"] = "WAITING_FOR_SITUATION"
+
+        context.user_data.pop("situation", None)
+
+        # очищаем незавершённые данные Энергоматрицы
+        context.user_data.pop("energy_goal", None)
+        context.user_data.pop("energy_original_goal", None)
+        context.user_data.pop("energy_proposed_goal", None)
+        context.user_data.pop("energy_clarifications", None)
+        context.user_data.pop("energy_clarification_count", None)
+
+        await update.message.reply_text(
+            "Опишите ситуацию, которую хотите разобрать 🌿",
+            reply_markup=reply_markup
+        )
+
+        return
 
     # ⚡ Энергоматрица
     if user_text == "⚡ Энергоматрица":
@@ -762,19 +783,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=energy_continue_keyboard
         )
 
-        return
-        
-    # 🆕 Новый разбор
-    if user_text == "🆕 Новый разбор":
-        context.user_data["state"] = "WAITING_FOR_SITUATION"
-        context.user_data.pop("situation", None)
-
-        await update.message.reply_text(
-            "Опишите ситуацию, которую хотите разобрать 🌿",
-            reply_markup=reply_markup
-        )
-        return
-       
+        return   
+          
 
         # ✅ Цель подтверждена
     if (
