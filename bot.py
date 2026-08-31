@@ -550,7 +550,16 @@ async def finish_energy_matrix(
             "Хотите сделать ещё один расчёт?",
             reply_markup=energy_continue_keyboard
         )
+        # 🚫 После завершения расчёта ждём выбор кнопкой
+    
+    if state == "ENERGY_MATRIX_COMPLETE":
 
+        await update.message.reply_text(
+            "Пожалуйста, выберите дальнейшее действие с помощью кнопок 👇",
+            reply_markup=energy_continue_keyboard
+        )
+
+        return
 
 async def start(update, context):
     print("START OK")
@@ -764,7 +773,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
         return
-
+       
 
         # ✅ Цель подтверждена
     if (
@@ -822,7 +831,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         return
+        
+     # 🚫 В состоянии подтверждения цели принимаем только кнопки
+    if state == "ENERGY_MATRIX_CONFIRM_GOAL":
 
+        await update.message.reply_text(
+            "Пожалуйста, выберите один из вариантов с помощью кнопок 👇",
+            reply_markup=energy_goal_confirm_keyboard
+        )
+
+        return
+        
     # ✏️ Получили скорректированную цель
     if state == "ENERGY_MATRIX_WAITING_FOR_GOAL_CORRECTION":
 
