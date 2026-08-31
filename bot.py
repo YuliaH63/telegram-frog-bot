@@ -707,7 +707,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await update.message.reply_text(
                 "⚡ Энергоматрица\n\n"
-                "Опиши конкретную цель или ситуацию, относительно которой "
+                "Опишите конкретную цель или ситуацию, относительно которой "
                 "хотите определить своё текущее состояние энергии.\n\n"
                 "Например:\n"
                 "— хочу запустить новый проект\n"
@@ -725,7 +725,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=reply_markup
             )
         
-            return
+        return
 
     # ⚡ Ещё один расчёт Энергоматрицы
     if user_text == "⚡ Да, ещё расчёт":
@@ -974,7 +974,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=energy_goal_confirm_keyboard
             )
 
-    return
+        return
     
     # 📍 Если ждём ситуацию
     if state == "WAITING_FOR_SITUATION":
