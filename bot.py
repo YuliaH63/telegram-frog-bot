@@ -673,7 +673,59 @@ energy_no_balance_keyboard = InlineKeyboardMarkup([
     ]
 ])
 
+async def add_energy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    # Команда доступна только администратору
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text(
+            "⛔ Эта команда доступна только администратору."
+        )
+        return
+
+    # Проверяем формат команды
+    if len(context.args) != 2:
+        await update.message.reply_text(
+            "Использование:\n"
+            "/addenergy TELEGRAM_ID КОЛИЧЕСТВО\n\n"
+            "Например:\n"
+            "/addenergy 123456789 3"
+        )
+        return
+
+    try:
+        telegram_id = int(context.args[0])
+        amount = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Telegram ID и количество должны быть числами."
+        )
+        return
+
+    if amount <= 0:
+        await update.message.reply_text(
+            "❌ Количество расчётов должно быть больше нуля."
+        )
+        return
+
+    # Находим или создаём пользователя в нашей БД
+    user_id = get_or_create_user(
+        telegram_id=telegram_id,
+        username=None
+    )
+
+    get_or_create_energy_access(user_id)
+
+    # Добавляем расчёты
+    add_energy_calculations(user_id, amount)
+
+    # Получаем новый баланс
+    balance, unlimited = get_or_create_energy_access(user_id)
+
+    await update.message.reply_text(
+        f"✅ Добавлено расчётов: {amount}\n"
+        f"Telegram ID: {telegram_id}\n"
+        f"⚡ Текущий баланс: {balance}"
+    )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text        
@@ -1063,6 +1115,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 application.add_handler(CommandHandler("start", start))
 #application.add_handler(MessageHandler(filters.ALL, debug))
+application.add_handler(CommandHandler("addenergy", add_energy_command))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 if __name__ == "__main__":
