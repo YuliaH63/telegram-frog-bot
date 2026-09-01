@@ -727,6 +727,17 @@ async def add_energy_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"⚡ Текущий баланс: {balance}"
     )
 
+async def myid_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+    telegram_id = update.effective_user.id
+
+    await update.message.reply_text(
+        f"🆔 Ваш Telegram ID:\n\n"
+        f"{telegram_id}"
+    )
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text        
     state = context.user_data.get("state", "WAITING_FOR_SITUATION")
@@ -1116,6 +1127,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application.add_handler(CommandHandler("start", start))
 #application.add_handler(MessageHandler(filters.ALL, debug))
 application.add_handler(CommandHandler("addenergy", add_energy_command))
+application.add_handler(CommandHandler("myid", myid_command))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 if __name__ == "__main__":
